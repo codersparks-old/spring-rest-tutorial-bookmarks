@@ -1,19 +1,28 @@
 package org.codersparks.bookmarks;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 import org.codersparks.bookmarks.dao.AccountRepository;
 import org.codersparks.bookmarks.dao.BookmarkRepository;
 import org.codersparks.bookmarks.model.Account;
 import org.codersparks.bookmarks.model.Bookmark;
+import org.codersparks.bookmarks.resource.BookmarkResource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.hateoas.Resources;
+import org.springframework.hateoas.VndErrors;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
@@ -44,16 +53,28 @@ public class BookmarkRestController {
 	}
 
 	@RequestMapping(value = "/{bookmarkId}", method = RequestMethod.GET)
-	Bookmark readBookmark(@PathVariable String userId,
+	public BookmarkResource readBookmark(@PathVariable String userId,
 			@PathVariable Long bookmarkId) {
 		this.validateUser(userId);
-		return this.bookmarkRepository.findOne(bookmarkId);
+		return new BookmarkResource(this.bookmarkRepository.findOne(bookmarkId));
 	}
 
 	@RequestMapping(method = RequestMethod.GET)
-	Collection<Bookmark> readBookmarks(@PathVariable String userId) {
+	Resources<BookmarkResource> readBookmarks(@PathVariable String userId) {
 		this.validateUser(userId);
-		return this.bookmarkRepository.findByAccountUsername(userId);
+		
+		Collection<Bookmark> bookmarks = this.bookmarkRepository.findByAccountUsername(userId);
+		
+		List<BookmarkResource> resources = new ArrayList<BookmarkResource>();
+		
+		if(bookmarks != null && bookmarks.size() > 0)
+		{
+			for(Bookmark bookmark : bookmarks) {
+				resources.add(new BookmarkResource(bookmark));
+			}
+		}
+		
+		return new Resources<BookmarkResource>(resources);
 	}
 	
 	@RequestMapping(value="/{id}", method=RequestMethod.DELETE)
@@ -84,6 +105,17 @@ public class BookmarkRestController {
 	}
 	
 	
+}
+
+@ControllerAdvice
+class BookmarkControllerAdvice {
+	
+	@ResponseBody
+	@ExceptionHandler(UserNotFoundException.class)
+	@ResponseStatus(HttpStatus.NOT_FOUND)
+	VndErrors userNotFoundExceptionHandler(UserNotFoundException ex) {
+		return new VndErrors("error", ex.getMessage());
+	}
 }
 
 @ResponseStatus(HttpStatus.NOT_FOUND)
